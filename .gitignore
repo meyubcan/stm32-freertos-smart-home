@@ -1,0 +1,7 @@
+build/
+*.o
+*.d
+*.map
+.vscode/
+.settings/
+.metadata/
