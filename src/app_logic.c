@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 #include "app_logic.h"
 
 int32_t Logic_TempDeciFromAdc(uint32_t raw12, uint32_t vdda_mv)

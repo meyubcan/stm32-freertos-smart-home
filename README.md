@@ -1,5 +1,7 @@
 # STM32F407 ve FreeRTOS ile akıllı ev kontrol merkezi
 
+> [TECH-OHM](https://tech-ohm.com) açık kaynak projesi
+
 STM32F407 Discovery kartı için FreeRTOS üzerinde çalışan çok görevli bir uygulama. Çipin iç sıcaklık sensörünü okuyor, sıcaklık eşiği geçince alarm verip fan çıkışını açıyor. Seri porttan komut alıyor, karttaki mavi butonla OLED sayfası değişiyor. OLED takılı değilse program yine çalışır, her şey UART'tan izlenir.
 
 FreeRTOS'a yeni başlayanların en çok takıldığı konuları tek bir projede toplamak istedim: kuyruk, mutex ve kesmeden göreve iş devretmek.
@@ -117,4 +119,10 @@ MIT. STM32Cube HAL, CMSIS ve FreeRTOS kendi lisanslarıyla gelir, bu depoda yer 
 
 ## Yazar
 
-Gömülü Sistem Mühendisi M. Eyüb Can, [TECH-OHM](https://tech-ohm.com)
+Gömülü Sistem Mühendisi M. Eyüb Can, [TECH-OHM](https://tech-ohm.com) kurucusu
+
+## TECH-OHM
+
+[TECH-OHM](https://tech-ohm.com) elektronik kart ve gömülü yazılım tasarlayan bir mühendislik firması. Fikirden seri üretime kadar tasarım işi alıyor, TECH-OHM Akademi'de 12 aylık gömülü sistem eğitimi ve şirketlere özel danışmanlık veriyor.
+
+Web: [tech-ohm.com](https://tech-ohm.com) · E-posta: info@tech-ohm.com

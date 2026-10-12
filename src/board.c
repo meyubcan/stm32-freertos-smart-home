@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 #include "board.h"
 #include "FreeRTOS.h"
 #include "semphr.h"

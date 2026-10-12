@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 #include "oled.h"
 #include <string.h>
 #include "board.h"

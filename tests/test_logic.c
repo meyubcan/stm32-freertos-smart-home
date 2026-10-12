@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 /* Bilgisayarda çalışan birim testleri: make test */
 #include <stdio.h>
 #include <string.h>

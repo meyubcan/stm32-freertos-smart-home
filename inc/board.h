@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 /* STM32F407G-DISC1 kart katmanı: pinler, LED'ler, ADC, UART ve I2C. */
 #ifndef BOARD_H
 #define BOARD_H

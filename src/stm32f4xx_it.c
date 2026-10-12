@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 /* Kesme vektörleri. SVC, PendSV ve SysTick FreeRTOS'a aittir (FreeRTOSConfig.h). */
 #include "board.h"
 

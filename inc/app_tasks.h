@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 #ifndef APP_TASKS_H
 #define APP_TASKS_H
 

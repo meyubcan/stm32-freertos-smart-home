@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 /* FreeRTOS hata kancaları: sorun olursa kırmızı LED hızlı yanıp söner, sistem durur. */
 #include "FreeRTOS.h"
 #include "task.h"

@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 /* Minimal SSD1306 (128x64, I2C) sürücüsü. Yazı tipi STM32Cube paketindeki Font8'dir. */
 #ifndef OLED_H
 #define OLED_H

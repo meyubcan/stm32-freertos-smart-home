@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "app_tasks.h"

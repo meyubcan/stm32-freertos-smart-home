@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 /* HAL'in 1 ms zaman tabanı TIM6'dan gelir; SysTick FreeRTOS'un tick kaynağı olarak serbest kalır. */
 #include "stm32f4xx_hal.h"
 

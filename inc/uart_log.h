@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 #ifndef UART_LOG_H
 #define UART_LOG_H
 

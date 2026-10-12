@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 /* Donanımdan bağımsız uygulama mantığı: bilgisayarda test edilebilir. */
 #ifndef APP_LOGIC_H
 #define APP_LOGIC_H

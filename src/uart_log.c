@@ -1,3 +1,4 @@
+/* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
 #include "uart_log.h"
 #include <stdarg.h>
 #include <stdio.h>
