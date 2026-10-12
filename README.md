@@ -1,20 +1,24 @@
-# STM32F407 ve FreeRTOS ile akıllı ev kontrol merkezi
+# Smart home control hub with FreeRTOS
 
-> [TECH-OHM](https://tech-ohm.com) açık kaynak projesi
+STM32F407 · 6 tasks · queues, mutex, semaphores · UART command line · OLED
 
-STM32F407 Discovery kartı için FreeRTOS üzerinde çalışan çok görevli bir uygulama. Çipin iç sıcaklık sensörünü okuyor, sıcaklık eşiği geçince alarm verip fan çıkışını açıyor. Seri porttan komut alıyor, karttaki mavi butonla OLED sayfası değişiyor. OLED takılı değilse program yine çalışır, her şey UART'tan izlenir.
+![MCU](https://img.shields.io/badge/MCU-STM32F407VG-03234B?logo=stmicroelectronics&logoColor=white) ![toolchain](https://img.shields.io/badge/toolchain-GCC_%2B_Make-2ea44f) ![License](https://img.shields.io/badge/license-MIT-blue) [![TECH-OHM](https://img.shields.io/badge/by-TECH--OHM-FFD400)](https://tech-ohm.com)
 
-FreeRTOS'a yeni başlayanların en çok takıldığı konuları tek bir projede toplamak istedim: kuyruk, mutex ve kesmeden göreve iş devretmek.
+**English** | [Türkçe](README.tr.md) · An open-source project by [TECH-OHM](https://tech-ohm.com)
 
-## Görevler
+A multitasking application for the STM32F407 Discovery board running on FreeRTOS. It reads the chip's internal temperature sensor, raises an alarm and switches a fan output when the temperature passes a threshold. It takes commands over the serial port, and the blue button on the board changes the OLED page. Without an OLED the program still runs and everything can be followed over UART.
+
+I wanted one project that covers what people new to FreeRTOS get stuck on most: queues, mutexes, and handing work from an interrupt to a task.
+
+## Tasks
 
 ```mermaid
 flowchart LR
-    ADC[ADC1 iç sıcaklık] --> S(SensorTask)
+    ADC[ADC1 internal temperature] --> S(SensorTask)
     S -- qSensor --> C(ControlTask)
-    C --> LED[Alarm ve fan LED'leri]
-    RX[USART2 RX kesmesi] -- qUartRx --> CMD(CommandTask)
-    BTN[USER butonu, EXTI0] -- semafor --> B(ButtonTask)
+    C --> LED[Alarm and fan LEDs]
+    RX[USART2 RX interrupt] -- qUartRx --> CMD(CommandTask)
+    BTN[USER button, EXTI0] -- semaphore --> B(ButtonTask)
     C --> ST[(AppState, mutex)]
     CMD --> ST
     B --> ST
@@ -23,71 +27,71 @@ flowchart LR
     CMD --> TX[UART terminal]
 ```
 
-Altı görev var:
+There are six tasks:
 
-- `SensorTask` saniyede bir ADC'yi okur ve sonucu kuyruğa atar. Kuyruk doluysa beklemez, ölçümü atıp sayacı artırır.
-- `ControlTask` kuyruktan ölçümü alır, beş ölçümün ortalamasını tutar, alarm ve fan kararını verir. En yüksek öncelik onda.
-- `DisplayTask` yarım saniyede bir OLED'i yeniler.
-- `CommandTask` seri porttan gelen satırı okuyup komutu çalıştırır.
-- `ButtonTask` buton kesmesinin verdiği semaforu bekler, kontak sıçramasını eleyip ekran sayfasını değiştirir.
-- `HeartbeatTask` yeşil LED'i yakıp söndürür. Kart kilitlendiyse ilk bakışta anlaşılır.
+- `SensorTask` reads the ADC once a second and puts the result on a queue. If the queue is full it does not wait. It drops the sample and increments a counter.
+- `ControlTask` takes the sample from the queue, keeps a five-sample average, and decides on alarm and fan. It has the highest priority.
+- `DisplayTask` refreshes the OLED twice a second.
+- `CommandTask` reads a line from the serial port and runs the command.
+- `ButtonTask` waits for the semaphore given by the button interrupt, filters contact bounce and changes the display page.
+- `HeartbeatTask` blinks the green LED. If the board locks up, you see it at a glance.
 
-Kesmelerin içinde iş yapılmıyor. UART kesmesi gelen baytı kuyruğa koyup çıkıyor, buton kesmesi semaforu verip çıkıyor. Ortak durum (`AppState_t`) tek bir mutex'in arkasında, her görev okurken de yazarken de onu alıyor.
+No work is done inside interrupts. The UART interrupt puts the received byte on a queue and returns, and the button interrupt gives a semaphore and returns. The shared state (`AppState_t`) sits behind a single mutex that every task takes for both reads and writes.
 
-## Donanım
+## Hardware
 
 ```mermaid
 flowchart LR
-    PC[Bilgisayar, seri terminal] -- USB --- TTL[USB-TTL dönüştürücü]
+    PC[PC, serial terminal] -- USB --- TTL[USB-TTL adapter]
     TTL -- "UART, 115200 8N1" --- MCU[STM32F407G-DISC1]
     MCU -- I2C1 --- OLED[SSD1306 OLED 128x64]
-    MCU --- LED[4 LED, kart üzerinde]
-    MCU --- BTN[USER butonu, kart üzerinde]
+    MCU --- LED[4 LEDs, on board]
+    MCU --- BTN[USER button, on board]
 ```
 
-| Kart pini | Bağlandığı yer | Açıklama |
+| Board pin | Connects to | Notes |
 |---|---|---|
 | PA2 | USB-TTL RXD | USART2 TX |
 | PA3 | USB-TTL TXD | USART2 RX |
-| GND | USB-TTL GND | ortak toprak |
+| GND | USB-TTL GND | common ground |
 | PB6 | OLED SCL | I2C1 |
 | PB9 | OLED SDA | I2C1 |
 | 3V | OLED VCC | |
 | GND | OLED GND | |
-| PA0 | USER butonu | kart üzerinde, kablo gerekmez |
-| PD12 | yeşil LED | kalp atışı |
-| PD13 | turuncu LED | her ölçümde değişir |
-| PD14 | kırmızı LED | alarm |
-| PD15 | mavi LED | fan çıkışı |
+| PA0 | USER button | on board, no wiring |
+| PD12 | green LED | heartbeat |
+| PD13 | orange LED | toggles on every sample |
+| PD14 | red LED | alarm |
+| PD15 | blue LED | fan output |
 
-USB-TTL'in 5V ve 3V3 pinlerini bağlama, kart kendi USB'sinden besleniyor. OLED adresi 0x3C.
+Do not connect the 5V or 3V3 pin of the USB-TTL adapter. The board is powered from its own USB. The OLED address is 0x3C.
 
-Sıcaklık için çipin kendi sensörünü kullandım, o yüzden ek sensör gerekmiyor. Ortam sıcaklığını değil çipin sıcaklığını gösterir, boşta 30 ile 45 C arasında bir değer okursun. Alarmı görmek için terminalden `SET 30` yazman yeterli.
+I used the chip's own temperature sensor, so no external sensor is needed. It shows the die temperature, not the room temperature, and reads somewhere between 30 and 45 °C at idle. Type `SET 30` in the terminal to see the alarm.
 
-## Derleme
+## Build
 
-`arm-none-eabi-gcc`, `make` ve STM32CubeF4 paketi lazım. CubeIDE kuruluysa üçü de bilgisayarında var. HAL, CMSIS ve FreeRTOS kaynaklarını depoya koymadım, Makefile bunları Cube paketinden alıyor.
+You need `arm-none-eabi-gcc`, `make` and the STM32CubeF4 package. If STM32CubeIDE is installed you already have all three. The HAL, CMSIS and FreeRTOS sources are not in this repository. The Makefile takes them from the Cube package.
 
 ```bash
-make FW=C:/Users/<kullanici>/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3
+make FW=C:/Users/<user>/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3
 make test
 make flash
 ```
 
-`make test` komut ayrıştırma, histerezis ve sıcaklık hesabını bilgisayarda dener, kart gerekmez. `make flash` için STM32_Programmer_CLI kurulu olmalı. Çıktı 24 KB Flash ve 46 KB RAM tutuyor, RAM'in 40 KB'ı FreeRTOS heap'i.
+`make test` runs the command parser, hysteresis and temperature math on the PC, with no board needed. `make flash` needs STM32_Programmer_CLI. The image takes 24 KB of Flash and 46 KB of RAM, 40 KB of which is the FreeRTOS heap.
 
-CubeIDE'de açmak istersen yeni bir F407 projesi oluşturup FreeRTOS'u etkinleştir, sonra `src` ve `inc` içindekileri projeye kopyala.
+To open it in STM32CubeIDE, create a new F407 project with FreeRTOS enabled, then copy the contents of `src` and `inc` into it.
 
-## Komutlar
+## Commands
 
 ```
-HELP               komut listesi
-STATUS             sıcaklık, alarm, serbest heap ve görevlerin kalan yığını
-SET 35.5           alarm eşiği, 10 ile 80 C arası
-FAN ON|OFF|AUTO    fan modu
+HELP               command list
+STATUS             temperature, alarm, free heap and remaining stack of each task
+SET 35.5           alarm threshold, 10 to 80 C
+FAN ON|OFF|AUTO    fan mode
 ```
 
-Terminalde şuna benzer bir çıktı görürsün:
+The terminal shows something like this (the log text is in Turkish):
 
 ```
 [disp] OLED hazir
@@ -97,32 +101,32 @@ esik = 30.0 C
 [ctrl] ALARM BASLADI: 36.5 C (esik 30.0 C)
 ```
 
-## Birkaç not
+## A few notes
 
-Sıcaklığı kayan nokta yerine onda bir derece hassasiyetinde tamsayı olarak tuttum (364, 36.4 C demek). Böylece `printf`'in float desteğini bağlamaya gerek kalmadı, kod da küçük kaldı.
+Temperature is stored as an integer in tenths of a degree (364 means 36.4 C) and not as a float. That way `printf` float support does not have to be linked in, and the code stays small.
 
-Alarm eşikte açılıyor ama eşiğin 2 C altına inmeden kapanmıyor. Histerezis olmayınca sıcaklık eşik civarında gezinirken fan sürekli açılıp kapanıyor.
+The alarm turns on at the threshold but does not turn off until the temperature falls 2 C below it. Without hysteresis the fan keeps switching on and off while the temperature hovers around the threshold.
 
-SysTick'i FreeRTOS kullanıyor, HAL'in 1 ms sayacını TIM6'ya taşıdım. İkisini aynı kesmede tutunca `HAL_Delay` çağıran sürücülerde tuhaf gecikmeler çıkabiliyor.
+FreeRTOS uses SysTick, so I moved the HAL 1 ms tick to TIM6. Keeping both on the same interrupt can cause odd delays in drivers that call `HAL_Delay`.
 
-USART2 ve EXTI0 kesmelerinin önceliği 6. `configMAX_SYSCALL_INTERRUPT_PRIORITY` 5 olduğu için bu kesmeler `FromISR` fonksiyonlarını çağırabiliyor. Önceliği 5'in altına çekersen sistem rastgele yerlerde kilitlenir, FreeRTOS'ta sık yapılan bir hata bu.
+The USART2 and EXTI0 interrupts have priority 6. Since `configMAX_SYSCALL_INTERRUPT_PRIORITY` is 5, these interrupts are allowed to call the `FromISR` functions. If you move their priority above that limit (a number lower than 5) the system locks up at random places, which is a common FreeRTOS mistake.
 
-Yığın boyutlarını tahminle verdim. `STATUS` her görevin kalan yığınını yazıyor, kartta bir süre çalıştırıp fazlasını kısmak lazım.
+The stack sizes are estimates. `STATUS` prints the remaining stack of each task, so run it on the board for a while and trim what is not needed.
 
-## Durum
+## Status
 
-Kod derleniyor ve testler geçiyor, ama kart üzerinde henüz denemedim. İlk fırsatta deneyip sonucu buraya yazacağım. Sen denersen ve bir sorun görürsen issue açman yeterli.
+The code builds and the tests pass, but I have not run it on the board yet. I will try it at the first opportunity and write the result here. If you try it and see a problem, opening an issue is enough.
 
-## Lisans
+## License
 
-MIT. STM32Cube HAL, CMSIS ve FreeRTOS kendi lisanslarıyla gelir, bu depoda yer almaz.
+MIT. STM32Cube HAL, CMSIS and FreeRTOS come with their own licenses and are not included in this repository.
 
-## Yazar
+## Author
 
-Gömülü Sistem Mühendisi M. Eyüb Can, [TECH-OHM](https://tech-ohm.com) kurucusu
+M. Eyüb Can, embedded systems engineer and founder of [TECH-OHM](https://tech-ohm.com)
 
-## TECH-OHM
+## About TECH-OHM
 
-[TECH-OHM](https://tech-ohm.com) elektronik kart ve gömülü yazılım tasarlayan bir mühendislik firması. Fikirden seri üretime kadar tasarım işi alıyor, TECH-OHM Akademi'de 12 aylık gömülü sistem eğitimi ve şirketlere özel danışmanlık veriyor.
+[TECH-OHM](https://tech-ohm.com) designs electronic boards and embedded software, from the first schematic to series production. We also run a 12-month embedded systems training program and consult for engineering teams.
 
-Web: [tech-ohm.com](https://tech-ohm.com) · E-posta: info@tech-ohm.com
+Web: [tech-ohm.com](https://tech-ohm.com) · Email: info@tech-ohm.com
