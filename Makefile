@@ -1,10 +1,10 @@
-# STM32F407G-DISC1 FreeRTOS akıllı ev kontrol merkezi
+# STM32F407G-DISC1 smart home control hub with FreeRTOS
 #
-# Gerekenler: arm-none-eabi-gcc, make ve STM32CubeF4 paketi (HAL, CMSIS, FreeRTOS, yazı tipleri).
-#   make                 firmware'i derler (build/firmware.elf, .bin, .hex)
-#   make FW=/yol/STM32Cube_FW_F4_V1.28.3      paket başka yerdeyse
-#   make test            donanımsız mantık testlerini bilgisayarda çalıştırır
-#   make flash           ST-LINK ile yükler (STM32_Programmer_CLI gerekir)
+# Needs: arm-none-eabi-gcc, make and the STM32CubeF4 package (HAL, CMSIS, FreeRTOS, fonts).
+#   make                 builds the firmware (build/firmware.elf, .bin, .hex)
+#   make FW=/path/STM32Cube_FW_F4_V1.28.3     if the package is somewhere else
+#   make test            runs the hardware-free logic tests on the PC
+#   make flash           flashes over ST-LINK (needs STM32_Programmer_CLI)
 
 FW ?= $(subst \,/,$(USERPROFILE))/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.3
 

@@ -9,10 +9,10 @@
 #define OLED_ADDR   (0x3C << 1)
 #define OLED_WIDTH  128
 #define OLED_HEIGHT 64
-#define CHAR_W      6   /* Font8 genişliği 5 piksel + 1 boşluk */
+#define CHAR_W      6   /* Font8 is 5 pixels wide plus 1 pixel of spacing */
 
 static uint8_t s_fb[OLED_WIDTH * OLED_HEIGHT / 8];
-static SemaphoreHandle_t s_busMutex;   /* I2C hattını ileride başka sensörlerle paylaşmak için */
+static SemaphoreHandle_t s_busMutex;   /* so the I2C bus can be shared with other sensors later */
 
 static bool cmd(const uint8_t *c, uint16_t n)
 {
@@ -22,20 +22,20 @@ static bool cmd(const uint8_t *c, uint16_t n)
 bool Oled_Init(void)
 {
     static const uint8_t init[] = {
-        0xAE,             /* ekran kapalı */
-        0xD5, 0x80,       /* saat bölücü */
-        0xA8, 0x3F,       /* 64 satır */
-        0xD3, 0x00,       /* ofset yok */
-        0x40,             /* başlangıç satırı */
-        0x8D, 0x14,       /* dahili şarj pompası açık */
-        0x20, 0x00,       /* yatay adresleme */
-        0xA1, 0xC8,       /* ayna: sağ-sol ve üst-alt */
+        0xAE,             /* display off */
+        0xD5, 0x80,       /* clock divider */
+        0xA8, 0x3F,       /* 64 rows */
+        0xD3, 0x00,       /* no offset */
+        0x40,             /* start line */
+        0x8D, 0x14,       /* internal charge pump on */
+        0x20, 0x00,       /* horizontal addressing */
+        0xA1, 0xC8,       /* mirror: left-right and top-bottom */
         0xDA, 0x12,
-        0x81, 0xCF,       /* kontrast */
+        0x81, 0xCF,       /* contrast */
         0xD9, 0xF1,
         0xDB, 0x40,
-        0xA4, 0xA6,       /* RAM içeriğini göster, normal polarite */
-        0xAF              /* ekran açık */
+        0xA4, 0xA6,       /* show RAM content, normal polarity */
+        0xAF              /* display on */
     };
 
     if (s_busMutex == NULL) {
@@ -74,7 +74,7 @@ static void put_char(unsigned x, unsigned y, char c)
     for (unsigned row = 0; row < Font8.Height; row++) {
         uint8_t line = g[row];
         for (unsigned col = 0; col < Font8.Width; col++) {
-            if (line & (0x80U >> col)) {      /* en soldaki piksel en yüksek bit */
+            if (line & (0x80U >> col)) {      /* leftmost pixel is the highest bit */
                 put_pixel(x + col, y + row);
             }
         }

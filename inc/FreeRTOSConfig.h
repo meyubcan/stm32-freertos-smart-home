@@ -28,12 +28,12 @@ void vAssertCalled(const char *file, int line);
 #define configSUPPORT_DYNAMIC_ALLOCATION          1
 #define configENABLE_BACKWARD_COMPATIBILITY       0
 
-/* Hata yakalama: stack taşması ve bellek yetersizliği kancaları hooks.c içinde. */
+/* Fault catching: the stack overflow and out-of-memory hooks are in hooks.c. */
 #define configCHECK_FOR_STACK_OVERFLOW            2
 #define configUSE_MALLOC_FAILED_HOOK              1
 #define configASSERT(x)                           do { if ((x) == 0) { vAssertCalled(__FILE__, __LINE__); } } while (0)
 
-/* Kullanılan API'ler */
+/* APIs in use */
 #define INCLUDE_vTaskDelay                        1
 #define INCLUDE_vTaskDelayUntil                   1
 #define INCLUDE_vTaskDelete                       0
@@ -41,15 +41,15 @@ void vAssertCalled(const char *file, int line);
 #define INCLUDE_xTaskGetSchedulerState            1
 #define INCLUDE_uxTaskGetStackHighWaterMark       1
 
-/* Cortex-M4: 4 öncelik biti. Bu değerin altındaki (sayısal olarak küçük) kesmeler
-   FreeRTOS API'si çağıramaz. */
+/* Cortex-M4: 4 priority bits. Interrupts with a numerically lower priority than this
+   value must not call the FreeRTOS API. */
 #define configPRIO_BITS                           4
 #define configLIBRARY_LOWEST_INTERRUPT_PRIORITY   15
 #define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY 5
 #define configKERNEL_INTERRUPT_PRIORITY           (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY      (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 
-/* FreeRTOS kesme işleyicileri CMSIS'in vektör adlarına bağlanır. */
+/* The FreeRTOS interrupt handlers are mapped to the CMSIS vector names. */
 #define vPortSVCHandler     SVC_Handler
 #define xPortPendSVHandler  PendSV_Handler
 #define xPortSysTickHandler SysTick_Handler

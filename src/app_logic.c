@@ -3,9 +3,9 @@
 
 int32_t Logic_TempDeciFromAdc(uint32_t raw12, uint32_t vdda_mv)
 {
-    /* Vsense (mV), yuvarlamalı */
+    /* Vsense (mV), rounded */
     int32_t v_mv = (int32_t)((raw12 * vdda_mv + 2047U) / 4095U);
-    /* T = (Vsense - 0.76 V) / 2.5 mV + 25 C  ->  deci derece: (v - 760) * 4 + 250 */
+    /* T = (Vsense - 0.76 V) / 2.5 mV + 25 C  ->  tenths of a degree: (v - 760) * 4 + 250 */
     return (v_mv - 760) * 4 + 250;
 }
 
@@ -25,7 +25,7 @@ static char up(char c)
     return (c >= 'a' && c <= 'z') ? (char)(c - 'a' + 'A') : c;
 }
 
-/* Başındaki boşlukları atlar. */
+/* Skips leading spaces. */
 static const char *skip_ws(const char *s)
 {
     while (*s == ' ' || *s == '\t') {
@@ -34,7 +34,7 @@ static const char *skip_ws(const char *s)
     return s;
 }
 
-/* s, kelimenin başındaysa ve kelime word ile aynıysa kelimeden sonrasını döndürür. */
+/* If s starts with the given word, returns what follows it. */
 static const char *match_word(const char *s, const char *word)
 {
     s = skip_ws(s);
@@ -51,7 +51,7 @@ static const char *match_word(const char *s, const char *word)
     return s;
 }
 
-/* "35" veya "35.5" -> 350 / 355. Sonrasında yalnızca boşluk olabilir. */
+/* "35" or "35.5" -> 350 / 355. Only spaces may follow. */
 static bool parse_deci(const char *s, int32_t *out)
 {
     int32_t whole = 0, frac = 0;
@@ -93,7 +93,7 @@ bool Logic_ParseCommand(const char *line, command_t *out)
     out->arg = 0;
     line = skip_ws(line);
     if (*line == '\0') {
-        return true; /* boş satır: sessizce yoksay */
+        return true; /* empty line: ignore quietly */
     }
 
     if (match_word(line, "HELP") || match_word(line, "?")) {

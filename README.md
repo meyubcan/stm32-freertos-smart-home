@@ -91,14 +91,14 @@ SET 35.5           alarm threshold, 10 to 80 C
 FAN ON|OFF|AUTO    fan mode
 ```
 
-The terminal shows something like this (the log text is in Turkish):
+The terminal shows something like this:
 
 ```
-[disp] OLED hazir
-[ctrl] sicaklik=36.4 C esik=40.0 C alarm=0 fan=0
+[disp] OLED ready
+[ctrl] temp=36.4 C limit=40.0 C alarm=0 fan=0
 SET 30
-esik = 30.0 C
-[ctrl] ALARM BASLADI: 36.5 C (esik 30.0 C)
+limit = 30.0 C
+[ctrl] ALARM STARTED: 36.5 C (limit 30.0 C)
 ```
 
 ## A few notes

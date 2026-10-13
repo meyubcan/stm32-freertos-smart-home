@@ -2,8 +2,8 @@
 ENTRY(Reset_Handler)
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);
-_Min_Heap_Size  = 0x200;    /* newlib için; FreeRTOS kendi heap_4 dizisini kullanır */
-_Min_Stack_Size = 0x800;    /* kesme ve main için MSP yığını */
+_Min_Heap_Size  = 0x200;    /* for newlib. FreeRTOS uses its own heap_4 array */
+_Min_Stack_Size = 0x800;    /* MSP stack for interrupts and main */
 
 MEMORY
 {

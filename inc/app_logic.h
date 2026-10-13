@@ -1,5 +1,5 @@
 /* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
-/* Donanımdan bağımsız uygulama mantığı: bilgisayarda test edilebilir. */
+/* Application logic with no hardware dependency, so it can be tested on a PC. */
 #ifndef APP_LOGIC_H
 #define APP_LOGIC_H
 
@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Sıcaklıklar "deci derece" tutulur: 364 = 36.4 C. Kayan nokta kullanılmaz. */
+/* Temperatures are kept in tenths of a degree: 364 = 36.4 C. No floating point. */
 #define TEMP_THR_MIN_DECI   100
 #define TEMP_THR_MAX_DECI   800
 #define TEMP_DEFAULT_THR    400
@@ -26,7 +26,7 @@ typedef enum {
 
 typedef struct {
     cmd_type_t type;
-    int32_t arg;   /* CMD_SET için eşik, deci derece */
+    int32_t arg;   /* threshold for CMD_SET, tenths of a degree */
 } command_t;
 
 #define AVG_WINDOW 5
@@ -37,19 +37,19 @@ typedef struct {
     uint8_t head;
 } avg_t;
 
-/* STM32F4 iç sıcaklık sensörü: V25 = 0.76 V, eğim = 2.5 mV/C. Dönüş: deci derece. */
+/* STM32F4 internal temperature sensor: V25 = 0.76 V, slope = 2.5 mV/C. Returns tenths of a degree. */
 int32_t Logic_TempDeciFromAdc(uint32_t raw12, uint32_t vdda_mv);
 
-/* Histerezisli alarm: eşiğe ulaşınca açılır, (eşik - histerezis) altına inince kapanır. */
+/* Alarm with hysteresis: turns on at the threshold, turns off below (threshold - hysteresis). */
 bool Logic_AlarmUpdate(bool alarm, int32_t temp_deci, int32_t thr_deci, int32_t hyst_deci);
 
-/* Seri porttan gelen bir satırı komuta çevirir. Büyük/küçük harf fark etmez. */
+/* Turns a line from the serial port into a command. Case does not matter. */
 bool Logic_ParseCommand(const char *line, command_t *out);
 
 /* 364 -> "36.4" */
 void Logic_FormatDeci(char *buf, size_t n, int32_t deci);
 
-/* Kayan ortalama: yeni değeri ekler, güncel ortalamayı döndürür. */
+/* Moving average: adds the new value and returns the current average. */
 void    Avg_Init(avg_t *a);
 int32_t Avg_Push(avg_t *a, int32_t v);
 

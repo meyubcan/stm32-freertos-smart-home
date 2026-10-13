@@ -5,10 +5,10 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 
-/* EXTI0 kesmesi bu semafora verir, ButtonTask bekler. */
+/* The EXTI0 interrupt gives this semaphore and ButtonTask waits on it. */
 extern SemaphoreHandle_t g_semButton;
 
-/* Kuyrukları, mutex'leri ve görevleri oluşturur. Zamanlayıcı main'de başlar. */
+/* Creates the queues, mutexes and tasks. The scheduler is started in main. */
 void App_Init(void);
 
 #endif

@@ -1,11 +1,11 @@
 /*
- * Akıllı ev kontrol merkezi: görevler ve aralarındaki iletişim.
+ * Smart home control hub: the tasks and how they talk to each other.
  *
- *   SensorTask  --(qSensor kuyruğu)-->  ControlTask  --(durum, mutex)-->  DisplayTask
- *   UART kesmesi --(g_qUartRx kuyruğu)--> CommandTask  --(durum, mutex)-->  ...
- *   Buton kesmesi --(g_semButton semaforu)--> ButtonTask --(durum, mutex)--> ...
+ *   SensorTask  --(qSensor queue)-->  ControlTask  --(state, mutex)-->  DisplayTask
+ *   UART interrupt --(g_qUartRx queue)--> CommandTask  --(state, mutex)-->  ...
+ *   Button interrupt --(g_semButton semaphore)--> ButtonTask --(state, mutex)--> ...
  *
- * Ortak veri (AppState_t) yalnızca s_stateMutex altında okunur ve yazılır.
+ * The shared data (AppState_t) is read and written only under s_stateMutex.
  */
 #include "app_tasks.h"
 #include <string.h>
@@ -21,14 +21,14 @@
 typedef enum { FAN_AUTO = 0, FAN_FORCE_ON, FAN_FORCE_OFF } fan_mode_t;
 
 typedef struct {
-    int32_t    temp_deci;     /* kayan ortalamalı sıcaklık */
-    int32_t    thr_deci;      /* alarm eşiği */
+    int32_t    temp_deci;     /* temperature, moving average */
+    int32_t    thr_deci;      /* alarm threshold */
     bool       alarm;
     bool       fan_on;
     fan_mode_t fan_mode;
-    uint8_t    page;          /* OLED sayfası: 0 durum, 1 sistem */
-    uint32_t   samples;       /* işlenen ölçüm sayısı */
-    uint32_t   dropped;       /* kuyruk dolu olduğu için atılan ölçüm */
+    uint8_t    page;          /* OLED page: 0 status, 1 system */
+    uint32_t   samples;       /* samples processed */
+    uint32_t   dropped;       /* samples dropped because the queue was full */
 } AppState_t;
 
 typedef struct {
@@ -43,10 +43,10 @@ static QueueHandle_t     s_qSensor;
 static AppState_t        s_state;
 static bool              s_oledOk;
 
-/* Yığın kullanımını raporlamak için tutulur. */
+/* Kept so stack usage can be reported. */
 static TaskHandle_t s_hSensor, s_hControl, s_hDisplay, s_hCommand, s_hButton, s_hBeat;
 
-/* ---- ortak durum erişimi ---- */
+/* ---- shared state access ---- */
 static void state_get(AppState_t *copy)
 {
     xSemaphoreTake(s_stateMutex, portMAX_DELAY);
@@ -54,7 +54,7 @@ static void state_get(AppState_t *copy)
     xSemaphoreGive(s_stateMutex);
 }
 
-/* ---- 1. SensorTask: her saniye iç sıcaklığı ölçer ---- */
+/* ---- 1. SensorTask: reads the internal temperature every second ---- */
 static void SensorTask(void *arg)
 {
     TickType_t last = xTaskGetTickCount();
@@ -64,23 +64,23 @@ static void SensorTask(void *arg)
         uint32_t sum = 0;
         SensorMsg_t m;
 
-        for (int i = 0; i < 8; i++) {          /* 8 ölçümün ortalaması: gürültüyü azaltır */
+        for (int i = 0; i < 8; i++) {          /* average of 8 readings to cut noise */
             sum += Board_AdcReadTempRaw();
         }
         m.temp_deci = Logic_TempDeciFromAdc(sum / 8U, BOARD_VDDA_MV);
         m.tick = xTaskGetTickCount();
 
-        if (xQueueSend(s_qSensor, &m, 0) != pdPASS) {   /* ControlTask yetişemediyse ölçümü at, bloklanma */
+        if (xQueueSend(s_qSensor, &m, 0) != pdPASS) {   /* if ControlTask is behind, drop the sample and do not block */
             xSemaphoreTake(s_stateMutex, portMAX_DELAY);
             s_state.dropped++;
             xSemaphoreGive(s_stateMutex);
         }
         Board_LedToggle(LED_ORANGE);
-        vTaskDelayUntil(&last, pdMS_TO_TICKS(1000));    /* sabit periyot: kayma birikmez */
+        vTaskDelayUntil(&last, pdMS_TO_TICKS(1000));    /* fixed period, no drift builds up */
     }
 }
 
-/* ---- 2. ControlTask: ölçümü işler, alarm ve fan kararını verir ---- */
+/* ---- 2. ControlTask: processes the sample, decides on alarm and fan ---- */
 static void ControlTask(void *arg)
 {
     avg_t avg;
@@ -120,14 +120,14 @@ static void ControlTask(void *arg)
         Logic_FormatDeci(t, sizeof t, filtered);
         Logic_FormatDeci(th, sizeof th, thr);
         if (alarm != prev_alarm) {
-            Log("[ctrl] ALARM %s: %s C (esik %s C)\r\n", alarm ? "BASLADI" : "BITTI", t, th);
+            Log("[ctrl] ALARM %s: %s C (limit %s C)\r\n", alarm ? "STARTED" : "CLEARED", t, th);
         } else if (n % 5U == 0U) {
-            Log("[ctrl] sicaklik=%s C esik=%s C alarm=%d fan=%d\r\n", t, th, alarm, fan);
+            Log("[ctrl] temp=%s C limit=%s C alarm=%d fan=%d\r\n", t, th, alarm, fan);
         }
     }
 }
 
-/* ---- 3. DisplayTask: OLED'e (varsa) durumu çizer ---- */
+/* ---- 3. DisplayTask: draws the state on the OLED, if there is one ---- */
 static void append(char *dst, size_t n, const char *src)
 {
     size_t l = strlen(dst);
@@ -137,7 +137,7 @@ static void append(char *dst, size_t n, const char *src)
     dst[l] = '\0';
 }
 
-/* Küçük işaretsiz sayıyı ondalık yazıya çevirir (printf'siz). */
+/* Converts a small unsigned number to decimal text without printf. */
 static void fmt_u32(char *dst, size_t n, uint32_t x)
 {
     char tmp[11];
@@ -161,7 +161,7 @@ static void DisplayTask(void *arg)
     (void)arg;
 
     s_oledOk = Oled_Init();
-    Log("[disp] OLED %s\r\n", s_oledOk ? "hazir" : "bulunamadi, yalnizca UART kullanilacak");
+    Log("[disp] OLED %s\r\n", s_oledOk ? "ready" : "not found, using UART only");
 
     for (;;) {
         if (s_oledOk) {
@@ -170,25 +170,25 @@ static void DisplayTask(void *arg)
             Oled_Clear();
             Oled_Print(0, 0, "TECH-OHM  FreeRTOS");
             if (s.page == 0) {
-                line[0] = '\0'; append(line, sizeof line, "Sicaklik "); Logic_FormatDeci(v, sizeof v, s.temp_deci); append(line, sizeof line, v); append(line, sizeof line, " C");
+                line[0] = '\0'; append(line, sizeof line, "Temp     "); Logic_FormatDeci(v, sizeof v, s.temp_deci); append(line, sizeof line, v); append(line, sizeof line, " C");
                 Oled_Print(2, 0, line);
-                line[0] = '\0'; append(line, sizeof line, "Esik     "); Logic_FormatDeci(v, sizeof v, s.thr_deci); append(line, sizeof line, v); append(line, sizeof line, " C");
+                line[0] = '\0'; append(line, sizeof line, "Limit    "); Logic_FormatDeci(v, sizeof v, s.thr_deci); append(line, sizeof line, v); append(line, sizeof line, " C");
                 Oled_Print(3, 0, line);
-                Oled_Print(5, 0, s.alarm ? "ALARM: VAR" : "ALARM: yok");
-                Oled_Print(6, 0, s.fan_on ? "FAN: ACIK" : "FAN: kapali");
-                Oled_Print(7, 0, s.fan_mode == FAN_AUTO ? "mod: otomatik" : "mod: manuel");
+                Oled_Print(5, 0, s.alarm ? "ALARM: ON" : "ALARM: off");
+                Oled_Print(6, 0, s.fan_on ? "FAN: ON" : "FAN: off");
+                Oled_Print(7, 0, s.fan_mode == FAN_AUTO ? "mode: auto" : "mode: manual");
             } else {
                 char u[12], num[12];
                 uint32_t h = up / 3600U, mi = (up / 60U) % 60U, sec = up % 60U;
                 u[0] = (char)('0' + (h / 10U) % 10U); u[1] = (char)('0' + h % 10U); u[2] = ':';
                 u[3] = (char)('0' + mi / 10U); u[4] = (char)('0' + mi % 10U); u[5] = ':';
                 u[6] = (char)('0' + sec / 10U); u[7] = (char)('0' + sec % 10U); u[8] = '\0';
-                line[0] = '\0'; append(line, sizeof line, "Calisma: "); append(line, sizeof line, u);
+                line[0] = '\0'; append(line, sizeof line, "Uptime: "); append(line, sizeof line, u);
                 Oled_Print(2, 0, line);
                 fmt_u32(num, sizeof num, s.samples);
-                line[0] = '\0'; append(line, sizeof line, "Olcum: "); append(line, sizeof line, num);
+                line[0] = '\0'; append(line, sizeof line, "Samples: "); append(line, sizeof line, num);
                 Oled_Print(4, 0, line);
-                Oled_Print(6, 0, "Buton: sayfa degistir");
+                Oled_Print(6, 0, "Button: next page");
             }
             Oled_Update();
         }
@@ -196,33 +196,33 @@ static void DisplayTask(void *arg)
     }
 }
 
-/* ---- 4. ButtonTask: kesme semaforunu bekler, sayfa değiştirir ---- */
+/* ---- 4. ButtonTask: waits for the interrupt semaphore, changes the page ---- */
 static void ButtonTask(void *arg)
 {
     (void)arg;
     for (;;) {
-        xSemaphoreTake(g_semButton, portMAX_DELAY);     /* kesme gelene kadar CPU harcamaz */
-        vTaskDelay(pdMS_TO_TICKS(30));                  /* kontak sıçramasını bekle */
-        while (xSemaphoreTake(g_semButton, 0) == pdPASS) { }   /* sıçrama kenarlarını at */
+        xSemaphoreTake(g_semButton, portMAX_DELAY);     /* uses no CPU until the interrupt comes */
+        vTaskDelay(pdMS_TO_TICKS(30));                  /* wait out the contact bounce */
+        while (xSemaphoreTake(g_semButton, 0) == pdPASS) { }   /* discard the bounce edges */
         if (Board_ButtonPressed()) {
             uint8_t page;
             xSemaphoreTake(s_stateMutex, portMAX_DELAY);
             s_state.page ^= 1U;
             page = s_state.page;
             xSemaphoreGive(s_stateMutex);
-            Log("[btn] ekran sayfasi = %u\r\n", (unsigned)page);
+            Log("[btn] display page = %u\r\n", (unsigned)page);
         }
     }
 }
 
-/* ---- 5. CommandTask: seri porttan gelen komutları çalıştırır ---- */
+/* ---- 5. CommandTask: runs the commands that come from the serial port ---- */
 static void print_help(void)
 {
-    Log("\r\nKomutlar:\r\n"
-        "  STATUS        durum ve gorev yigin raporu\r\n"
-        "  SET <derece>  alarm esigi, 10 ile 80 arasi (ornek: SET 35.5)\r\n"
-        "  FAN ON|OFF|AUTO  fan modu\r\n"
-        "  HELP          bu liste\r\n");
+    Log("\r\nCommands:\r\n"
+        "  STATUS        state and task stack report\r\n"
+        "  SET <deg>     alarm limit, 10 to 80 (example: SET 35.5)\r\n"
+        "  FAN ON|OFF|AUTO  fan mode\r\n"
+        "  HELP          this list\r\n");
 }
 
 static void print_status(void)
@@ -233,11 +233,11 @@ static void print_status(void)
     state_get(&s);
     Logic_FormatDeci(t, sizeof t, s.temp_deci);
     Logic_FormatDeci(th, sizeof th, s.thr_deci);
-    Log("sicaklik=%s C esik=%s C alarm=%d fan=%d mod=%d sayfa=%u\r\n",
+    Log("temp=%s C limit=%s C alarm=%d fan=%d mode=%d page=%u\r\n",
         t, th, s.alarm, s.fan_on, (int)s.fan_mode, (unsigned)s.page);
-    Log("olcum=%lu atilan=%lu serbest heap=%u bayt\r\n",
+    Log("samples=%lu dropped=%lu free heap=%u bytes\r\n",
         (unsigned long)s.samples, (unsigned long)s.dropped, (unsigned)xPortGetFreeHeapSize());
-    Log("yigin kalan (kelime): sensor=%u kontrol=%u ekran=%u komut=%u buton=%u kalp=%u\r\n",
+    Log("stack left (words): sensor=%u control=%u display=%u cmd=%u button=%u beat=%u\r\n",
         (unsigned)uxTaskGetStackHighWaterMark(s_hSensor), (unsigned)uxTaskGetStackHighWaterMark(s_hControl),
         (unsigned)uxTaskGetStackHighWaterMark(s_hDisplay), (unsigned)uxTaskGetStackHighWaterMark(s_hCommand),
         (unsigned)uxTaskGetStackHighWaterMark(s_hButton), (unsigned)uxTaskGetStackHighWaterMark(s_hBeat));
@@ -251,7 +251,7 @@ static void CommandTask(void *arg)
     (void)arg;
 
     UartLog_StartRx();
-    Log("\r\nTECH-OHM FreeRTOS akilli ev kontrol merkezi hazir. Komutlar icin HELP yazin.\r\n");
+    Log("\r\nTECH-OHM FreeRTOS smart home hub ready. Type HELP for commands.\r\n");
 
     for (;;) {
         if (xQueueReceive(g_qUartRx, &c, portMAX_DELAY) != pdPASS) {
@@ -283,7 +283,7 @@ static void CommandTask(void *arg)
             s_state.thr_deci = cmd.arg;
             xSemaphoreGive(s_stateMutex);
             Logic_FormatDeci(th, sizeof th, cmd.arg);
-            Log("esik = %s C\r\n", th);
+            Log("limit = %s C\r\n", th);
             break;
         }
         case CMD_FAN_ON:
@@ -292,18 +292,18 @@ static void CommandTask(void *arg)
             xSemaphoreTake(s_stateMutex, portMAX_DELAY);
             s_state.fan_mode = cmd.type == CMD_FAN_ON ? FAN_FORCE_ON : cmd.type == CMD_FAN_OFF ? FAN_FORCE_OFF : FAN_AUTO;
             xSemaphoreGive(s_stateMutex);
-            Log("fan modu degisti\r\n");
+            Log("fan mode changed\r\n");
             break;
         default:
             break;
         }
         if (!ok) {
-            Log("gecersiz komut. HELP yazin.\r\n");
+            Log("unknown command. Type HELP.\r\n");
         }
     }
 }
 
-/* ---- 6. HeartbeatTask: sistem canlı mı? ---- */
+/* ---- 6. HeartbeatTask: is the system alive? ---- */
 static void HeartbeatTask(void *arg)
 {
     (void)arg;
@@ -318,12 +318,12 @@ void App_Init(void)
     s_state.thr_deci = TEMP_DEFAULT_THR;
     s_state.fan_mode = FAN_AUTO;
 
-    s_stateMutex = xSemaphoreCreateMutex();            /* öncelik mirası sağlar */
+    s_stateMutex = xSemaphoreCreateMutex();            /* gives priority inheritance */
     s_qSensor    = xQueueCreate(8, sizeof(SensorMsg_t));
     g_semButton  = xSemaphoreCreateBinary();
     configASSERT(s_stateMutex && s_qSensor && g_semButton);
 
-    /* Öncelik: Control 4 > Sensor, Button 3 > Command, Display 2 > Heartbeat 1 */
+    /* Priority: Control 4 > Sensor, Button 3 > Command, Display 2 > Heartbeat 1 */
     BaseType_t ok = pdPASS;
     ok &= xTaskCreate(SensorTask,    "sensor",  384, NULL, 3, &s_hSensor);
     ok &= xTaskCreate(ControlTask,   "control", 512, NULL, 4, &s_hControl);

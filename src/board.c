@@ -8,7 +8,7 @@ UART_HandleTypeDef huart2;
 I2C_HandleTypeDef  hi2c1;
 ADC_HandleTypeDef  hadc1;
 
-#define IRQ_PRIO_APP 6U   /* configMAX_SYSCALL_INTERRUPT_PRIORITY (5) değerinden büyük: FromISR çağırabilir */
+#define IRQ_PRIO_APP 6U   /* numerically above configMAX_SYSCALL_INTERRUPT_PRIORITY (5), so it may call FromISR */
 
 void Board_Init(void)
 {
@@ -18,7 +18,7 @@ void Board_Init(void)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
 
-    /* LED'ler: PD12..PD15 */
+    /* LEDs: PD12..PD15 */
     g.Pin = GPIO_PIN_12 | GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15;
     g.Mode = GPIO_MODE_OUTPUT_PP;
     g.Pull = GPIO_NOPULL;
@@ -26,7 +26,7 @@ void Board_Init(void)
     HAL_GPIO_Init(GPIOD, &g);
     HAL_GPIO_WritePin(GPIOD, g.Pin, GPIO_PIN_RESET);
 
-    /* USER butonu: PA0, kartta harici pull-down var, yükselen kenarda kesme */
+    /* USER button: PA0, external pull-down on the board, interrupt on rising edge */
     g.Pin = GPIO_PIN_0;
     g.Mode = GPIO_MODE_IT_RISING;
     g.Pull = GPIO_NOPULL;
@@ -47,7 +47,7 @@ void Board_Init(void)
         Error_Handler();
     }
 
-    /* ADC1: iç sıcaklık sensörü (kanal 16), tek dönüşüm, yazılım tetikli */
+    /* ADC1: internal temperature sensor (channel 16), single conversion, software trigger */
     hadc1.Instance = ADC1;
     hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
     hadc1.Init.Resolution = ADC_RESOLUTION_12B;
@@ -67,13 +67,13 @@ void Board_Init(void)
         ADC_ChannelConfTypeDef ch = {0};
         ch.Channel = ADC_CHANNEL_TEMPSENSOR;
         ch.Rank = 1;
-        ch.SamplingTime = ADC_SAMPLETIME_480CYCLES;   /* sıcaklık sensörü en az 10 us ister */
+        ch.SamplingTime = ADC_SAMPLETIME_480CYCLES;   /* the temperature sensor needs at least 10 us */
         if (HAL_ADC_ConfigChannel(&hadc1, &ch) != HAL_OK) {
             Error_Handler();
         }
     }
 
-    /* I2C1: 100 kHz. Kartın ses entegresiyle aynı hat, adresler çakışmaz. */
+    /* I2C1: 100 kHz. Same bus as the board's audio codec, the addresses do not clash. */
     hi2c1.Instance = I2C1;
     hi2c1.Init.ClockSpeed = 100000;
     hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
@@ -88,7 +88,7 @@ void Board_Init(void)
     }
 }
 
-/* ---- HAL Msp: saat ve pin ayarları ---- */
+/* ---- HAL Msp: clocks and pins ---- */
 void HAL_UART_MspInit(UART_HandleTypeDef *h)
 {
     if (h->Instance == USART2) {
@@ -128,7 +128,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *h)
     }
 }
 
-/* ---- LED, buton, ADC ---- */
+/* ---- LED, button, ADC ---- */
 void Board_Led(board_led_t led, bool on)
 {
     HAL_GPIO_WritePin(GPIOD, (uint16_t)led, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -156,7 +156,7 @@ uint32_t Board_AdcReadTempRaw(void)
     return v;
 }
 
-/* ---- Buton kesmesi: semafor ver, işi ButtonTask yapsın ---- */
+/* ---- Button interrupt: give the semaphore and let ButtonTask do the work ---- */
 void HAL_GPIO_EXTI_Callback(uint16_t pin)
 {
     if (pin == GPIO_PIN_0 && g_semButton != NULL) {

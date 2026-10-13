@@ -5,13 +5,13 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 
-/* Alınan her bayt bu kuyruğa gider (kesmeden doldurulur, CommandTask okur). */
+/* Every received byte goes to this queue (filled from the interrupt, read by CommandTask). */
 extern QueueHandle_t g_qUartRx;
 
-void UartLog_Init(void);           /* mutex ve kuyruğu oluşturur */
-void UartLog_StartRx(void);        /* kesmeyle bayt almayı başlatır */
+void UartLog_Init(void);           /* creates the mutex and the queue */
+void UartLog_StartRx(void);        /* starts interrupt-driven reception */
 
-/* Görevler arası güvenli printf: tüm yazdırmalar tek mutex ile sıralanır. */
+/* printf that is safe across tasks: all output is serialized by one mutex. */
 void Log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 #endif

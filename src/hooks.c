@@ -1,5 +1,5 @@
 /* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
-/* FreeRTOS hata kancaları: sorun olursa kırmızı LED hızlı yanıp söner, sistem durur. */
+/* FreeRTOS error hooks: on a fault the red LED blinks fast and the system halts. */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "board.h"

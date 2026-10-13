@@ -92,11 +92,11 @@ FAN ON|OFF|AUTO    fan modu
 Terminalde şuna benzer bir çıktı görürsün:
 
 ```
-[disp] OLED hazir
-[ctrl] sicaklik=36.4 C esik=40.0 C alarm=0 fan=0
+[disp] OLED ready
+[ctrl] temp=36.4 C limit=40.0 C alarm=0 fan=0
 SET 30
-esik = 30.0 C
-[ctrl] ALARM BASLADI: 36.5 C (esik 30.0 C)
+limit = 30.0 C
+[ctrl] ALARM STARTED: 36.5 C (limit 30.0 C)
 ```
 
 ## Birkaç not

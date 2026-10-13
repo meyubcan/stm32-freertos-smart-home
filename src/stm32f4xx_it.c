@@ -1,5 +1,5 @@
 /* M. Eyub Can, TECH-OHM (https://tech-ohm.com) */
-/* Kesme vektörleri. SVC, PendSV ve SysTick FreeRTOS'a aittir (FreeRTOSConfig.h). */
+/* Interrupt vectors. SVC, PendSV and SysTick belong to FreeRTOS (FreeRTOSConfig.h). */
 #include "board.h"
 
 extern TIM_HandleTypeDef htim6;

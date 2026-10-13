@@ -38,12 +38,12 @@ static void SystemClock_Config(void)
 
 int main(void)
 {
-    HAL_Init();               /* öncelik gruplaması 4 bit: FreeRTOS için şart */
+    HAL_Init();               /* 4 bits of preemption priority, required by FreeRTOS */
     SystemClock_Config();
     Board_Init();
     UartLog_Init();
     App_Init();
-    vTaskStartScheduler();    /* buraya dönmez */
+    vTaskStartScheduler();    /* never returns here */
 
     for (;;) { }
 }

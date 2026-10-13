@@ -10,7 +10,7 @@ QueueHandle_t g_qUartRx;
 
 static SemaphoreHandle_t s_txMutex;
 static uint8_t s_rxByte;
-static char s_txBuf[160];   /* mutex altında kullanılır: tek tampon yeter */
+static char s_txBuf[160];   /* used under the mutex, so one buffer is enough */
 
 void UartLog_Init(void)
 {
@@ -47,12 +47,12 @@ void Log(const char *fmt, ...)
     xSemaphoreGive(s_txMutex);
 }
 
-/* ---- Kesme tarafı ---- */
+/* ---- Interrupt side ---- */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *h)
 {
     if (h->Instance == USART2 && g_qUartRx != NULL) {
         BaseType_t woken = pdFALSE;
-        /* Kuyruk doluysa bayt düşer, kesme asla bloklanmaz. */
+        /* If the queue is full the byte is dropped. The interrupt never blocks. */
         xQueueSendFromISR(g_qUartRx, &s_rxByte, &woken);
         HAL_UART_Receive_IT(&huart2, &s_rxByte, 1);
         portYIELD_FROM_ISR(woken);
@@ -62,7 +62,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *h)
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *h)
 {
     if (h->Instance == USART2) {
-        /* taşma, çerçeve hatası vb.: alımı yeniden başlat */
+        /* overrun, framing error and so on: restart reception */
         HAL_UART_Receive_IT(&huart2, &s_rxByte, 1);
     }
 }

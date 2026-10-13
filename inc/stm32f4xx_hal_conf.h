@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-/* Kullanılan HAL modülleri */
+/* HAL modules in use */
 #define HAL_MODULE_ENABLED
 #define HAL_ADC_MODULE_ENABLED
 #define HAL_CORTEX_MODULE_ENABLED
@@ -19,7 +19,7 @@ extern "C" {
 #define HAL_UART_MODULE_ENABLED
 #define HAL_EXTI_MODULE_ENABLED
 
-/* STM32F407G-DISC1: 8 MHz harici kristal */
+/* STM32F407G-DISC1: 8 MHz external crystal */
 #if !defined(HSE_VALUE)
 #define HSE_VALUE               8000000U
 #endif
@@ -43,7 +43,7 @@ extern "C" {
 #endif
 
 #define VDD_VALUE                  3300U
-/* HAL zaman tabanı TIM6'dan gelir (SysTick FreeRTOS'a ayrılır), en yüksek öncelik. */
+/* The HAL time base comes from TIM6 (SysTick is left to FreeRTOS), highest priority. */
 #define TICK_INT_PRIORITY          0U
 #define USE_RTOS                   0U
 #define PREFETCH_ENABLE            1U
